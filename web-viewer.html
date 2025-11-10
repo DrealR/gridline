@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRIDLINE Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #020814;
+      --grid: #101827;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.16);
+      --danger: #f97316;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #020817 0, #020814 40%, #000 100%);
+      color: #e5e7eb;
+      font-family: var(--font);
+    }
+    .frame {
+      width: min(900px, 100vw - 32px);
+      padding: 18px 20px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 253, 0.18);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 55%),
+        radial-gradient(circle at top right, rgba(147, 51, 234, 0.09), transparent 55%),
+        linear-gradient(to bottom, rgba(15,23,42,0.98), rgba(2,6,23,0.98));
+      box-shadow:
+        0 30px 90px rgba(15,23,42,0.9),
+        0 0 40px rgba(15,23,42,0.8) inset;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #9ca3af;
+    }
+    .title {
+      font-size: 13px;
+      color: var(--accent);
+    }
+    .pill {
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 253, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: radial-gradient(circle at top, rgba(56,189,248,0.16), transparent);
+      color: #9ca3af;
+    }
+    .pill span.dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
+    }
+    .grid-wrap {
+      margin-top: 6px;
+      padding: 14px 12px 10px;
+      border-radius: 14px;
+      background: radial-gradient(circle at top, var(--accent-soft), transparent 80%),
+                  linear-gradient(to bottom, rgba(9,9,11,0.94), rgba(2,6,23,0.98));
+      border: 1px solid rgba(75,85,99,0.55);
+      box-shadow: 0 10px 40px rgba(15,23,42,0.85);
+    }
+    .grid-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 9px;
+      color: #6b7280;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+    }
+    .cell {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: radial-gradient(circle at 30% 0, rgba(148,163,253,0.12), var(--grid));
+      border: 1px solid rgba(31,41,55,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #4b5563;
+      transition: all 0.17s ease-out;
+    }
+    .cell.me {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(56,189,248,0.6);
+      color: var(--accent);
+    }
+    .cell.op {
+      border-color: rgba(148,163,253,0.9);
+      color: #a5b4fc;
+      box-shadow: 0 0 6px rgba(129,140,248,0.8);
+    }
+    .cell.i {
+      background: radial-gradient(circle at 20% 0, rgba(248,250,252,0.06), rgba(2,6,23,1));
+      border-color: var(--danger);
+      color: var(--danger);
+      box-shadow: 0 0 9px rgba(249,115,22,0.7);
+    }
+    .cell.s {
+      background: radial-gradient(circle at 20% 0, rgba(22,163,74,0.18), rgba(2,6,23,1));
+      border-color: #22c55e;
+      color: #22c55e;
+      box-shadow: 0 0 9px rgba(22,163,74,0.7);
+    }
+    .footer {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      color: #6b7280;
+    }
+    .legend span { margin-right: 9px; }
+    .legend b { color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div>
+        <div class="title">GRIDLINE // LIVE SECTOR VIEW</div>
+        <div>Visualizing operators & control across the grid.</div>
+      </div>
+      <div class="pill"><span class="dot"></span> LINKED CLIENTS</div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid-labels">
+        <div>SECTOR 3F SNAPSHOT</div>
+        <div id="meta">ops: 0 · infiltrated: 0 · secured: 0</div>
+      </div>
+      <div id="grid" class="grid"></div>
+      <div class="footer">
+        <div class="legend">
+          <span><b>●</b> You</span>
+          <span><b>○</b> Other op</span>
+          <span><b>■</b> Infiltrated</span>
+          <span><b>■</b> Secured</span>
+        </div>
+        <div id="hint">Drive via CLI. Start: node gridline-server.js</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const gridEl = document.getElementById('grid');
+    const metaEl = document.getElementById('meta');
+
+    async function fetchState() {
+      try {
+        const res = await fetch('http://localhost:31337/state');
+        if (!res.ok) throw new Error('bad status');
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function render(state) {
+      gridEl.innerHTML = '';
+      if (!state) {
+        metaEl.textContent = 'waiting for GRIDLINE core...';
+        for (let i = 0; i < 40; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          gridEl.appendChild(cell);
+        }
+        return;
+      }
+
+      const { width, height, grid, players } = state;
+      let infil = 0, secured = 0;
+      const me = players[0] || null;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const cellEl = document.createElement('div');
+          cellEl.className = 'cell';
+
+          const cellBase = grid[y][x];
+          const here = players.filter(p => p.x === x && p.y === y);
+
+          if (me && me.x === x && me.y === y) {
+            cellEl.classList.add('me');
+            cellEl.textContent = me.symbol || '●';
+          } else if (here.length) {
+            cellEl.classList.add('op');
+            cellEl.textContent = here[0].symbol || '○';
+          } else if (cellBase === 'i') {
+            infil++;
+            cellEl.classList.add('i');
+            cellEl.textContent = '■';
+          } else if (cellBase === 's') {
+            secured++;
+            cellEl.classList.add('s');
+            cellEl.textContent = '■';
+          }
+
+          gridEl.appendChild(cellEl);
+        }
+      }
+
+      metaEl.textContent = `ops: ${players.length} · infiltrated: ${infil} · secured: ${secured}`;
+    }
+
+    async function tick() {
+      const state = await fetchState();
+      render(state);
+      setTimeout(tick, 400);
+    }
+
+    tick();
+  </script>
+</body>
+</html>
