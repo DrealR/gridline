@@ -11,6 +11,7 @@
       --accent: #38bdf8;
       --accent-soft: rgba(56, 189, 248, 0.16);
       --danger: #f97316;
+      --sentinel: #22c55e;
       --font: system-ui, -apple-system, BlinkMacSystemFont, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
     * { box-sizing: border-box; }
@@ -25,7 +26,7 @@
       font-family: var(--font);
     }
     .frame {
-      width: min(900px, 100vw - 32px);
+      width: min(980px, 100vw - 32px);
       padding: 18px 20px 16px;
       border-radius: 18px;
       border: 1px solid rgba(148, 163, 253, 0.18);
@@ -107,10 +108,15 @@
       box-shadow: 0 0 10px rgba(56,189,248,0.6);
       color: var(--accent);
     }
-    .cell.op {
-      border-color: rgba(148,163,253,0.9);
-      color: #a5b4fc;
-      box-shadow: 0 0 6px rgba(129,140,248,0.8);
+    .cell.op-infil {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 6px rgba(56,189,248,0.8);
+    }
+    .cell.op-sent {
+      border-color: var(--sentinel);
+      color: var(--sentinel);
+      box-shadow: 0 0 6px rgba(34,197,94,0.8);
     }
     .cell.i {
       background: radial-gradient(circle at 20% 0, rgba(248,250,252,0.06), rgba(2,6,23,1));
@@ -120,8 +126,8 @@
     }
     .cell.s {
       background: radial-gradient(circle at 20% 0, rgba(22,163,74,0.18), rgba(2,6,23,1));
-      border-color: #22c55e;
-      color: #22c55e;
+      border-color: var(--sentinel);
+      color: var(--sentinel);
       box-shadow: 0 0 9px rgba(22,163,74,0.7);
     }
     .footer {
@@ -134,6 +140,43 @@
     }
     .legend span { margin-right: 9px; }
     .legend b { color: #9ca3af; }
+    .ops-list {
+      margin-top: 4px;
+      font-size: 9px;
+      color: #9ca3af;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ops-list span {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid rgba(148,163,253,0.22);
+    }
+    .ops-list .inf {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .ops-list .sent {
+      border-color: var(--sentinel);
+      color: var(--sentinel);
+    }
+    .round-banner {
+      margin-left: auto;
+      font-size: 9px;
+      color: #9ca3af;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .round-winner {
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: rgba(15,23,42,0.96);
+      border: 1px solid rgba(148,163,253,0.4);
+      color: #e5e7eb;
+    }
   </style>
 </head>
 <body>
@@ -141,7 +184,7 @@
     <div class="header">
       <div>
         <div class="title">GRIDLINE // LIVE SECTOR VIEW</div>
-        <div>Visualizing operators & control across the grid.</div>
+        <div>Visualizing operators &amp; control across the grid.</div>
       </div>
       <div class="pill"><span class="dot"></span> LINKED CLIENTS</div>
     </div>
@@ -149,24 +192,29 @@
     <div class="grid-wrap">
       <div class="grid-labels">
         <div>SECTOR 3F SNAPSHOT</div>
-        <div id="meta">ops: 0 · infiltrated: 0 · secured: 0</div>
+        <div class="round-banner">
+          <span id="round-timer">round: --</span>
+          <span id="round-result" class="round-winner" style="display:none"></span>
+        </div>
       </div>
       <div id="grid" class="grid"></div>
+      <div class="ops-list" id="ops-list"></div>
       <div class="footer">
         <div class="legend">
-          <span><b>●</b> You</span>
-          <span><b>○</b> Other op</span>
+          <span><b>◇/■</b> Operators</span>
           <span><b>■</b> Infiltrated</span>
           <span><b>■</b> Secured</span>
         </div>
-        <div id="hint">Drive via CLI. Start: node gridline-server.js</div>
+        <div id="hint">Drive via CLI. Start: node gridline-server.js, then `node gridline-cli.js` in another terminal.</div>
       </div>
     </div>
   </div>
 
   <script>
     const gridEl = document.getElementById('grid');
-    const metaEl = document.getElementById('meta');
+    const metaTimer = document.getElementById('round-timer');
+    const resultEl = document.getElementById('round-result');
+    const opsListEl = document.getElementById('ops-list');
 
     async function fetchState() {
       try {
@@ -180,19 +228,30 @@
 
     function render(state) {
       gridEl.innerHTML = '';
+      opsListEl.innerHTML = '';
+
       if (!state) {
-        metaEl.textContent = 'waiting for GRIDLINE core...';
+        metaTimer.textContent = 'round: waiting for GRIDLINE core...';
         for (let i = 0; i < 40; i++) {
           const cell = document.createElement('div');
           cell.className = 'cell';
           gridEl.appendChild(cell);
         }
+        resultEl.style.display = 'none';
         return;
       }
 
-      const { width, height, grid, players } = state;
+      const { width, height, grid, players, round } = state;
       let infil = 0, secured = 0;
-      const me = players[0] || null;
+
+      // operators list
+      players.forEach(p => {
+        const tag = document.createElement('span');
+        tag.textContent = `${p.id} (${p.role === 'INFILTRATOR' ? '◇' : '■'})`;
+        tag.className = 'inf';
+        if (p.role === 'SENTINEL') tag.className = 'sent';
+        opsListEl.appendChild(tag);
+      });
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -202,12 +261,17 @@
           const cellBase = grid[y][x];
           const here = players.filter(p => p.x === x && p.y === y);
 
-          if (me && me.x === x && me.y === y) {
-            cellEl.classList.add('me');
-            cellEl.textContent = me.symbol || '●';
-          } else if (here.length) {
-            cellEl.classList.add('op');
-            cellEl.textContent = here[0].symbol || '○';
+          if (here.length === 1) {
+            const p = here[0];
+            if (p.role === 'INFILTRATOR') {
+              cellEl.classList.add('op-infil');
+            } else {
+              cellEl.classList.add('op-sent');
+            }
+            cellEl.textContent = p.symbol || '◇';
+          } else if (here.length > 1) {
+            cellEl.classList.add('op-infil');
+            cellEl.textContent = here.length;
           } else if (cellBase === 'i') {
             infil++;
             cellEl.classList.add('i');
@@ -222,7 +286,20 @@
         }
       }
 
-      metaEl.textContent = `ops: ${players.length} · infiltrated: ${infil} · secured: ${secured}`;
+      if (round && round.active) {
+        const secs = Math.max(Math.ceil(round.remainingMs / 1000), 0);
+        metaTimer.textContent = `round: ${secs}s remaining · ops: ${players.length} · i:${infil} · s:${secured}`;
+      } else {
+        metaTimer.textContent = `round: idle · ops: ${players.length} · i:${infil} · s:${secured}`;
+      }
+
+      if (round && round.lastResult) {
+        const { infil: ri, secured: rs, winner } = round.lastResult;
+        resultEl.style.display = 'inline-block';
+        resultEl.textContent = `last: ${winner} (i=${ri}, s=${rs})`;
+      } else {
+        resultEl.style.display = 'none';
+      }
     }
 
     async function tick() {

@@ -41,7 +41,9 @@ function post(path, payload) {
 }
 
 async function main() {
-  let id = process.argv[2] || null;
+  const args = process.argv.slice(2);
+  let id = args[0] && !args[0].startsWith('--') ? args[0] : null;
+  const botMode = args.includes('--bot');
 
   const joinRes = await post('/join', { id });
   if (!joinRes || !joinRes.id) {
@@ -60,6 +62,11 @@ async function main() {
   console.log('[ZONE] Sector 3F linked.');
   console.log('');
 
+  if (botMode) {
+    await runBot(id, joinRes.role);
+    return;
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -70,22 +77,51 @@ async function main() {
     const res = await post('/command', { id, command: cmd });
     if (res.error) {
       console.log('[ERR]', res.error);
-      return;
+      return false;
     }
     if (res.output) console.log(res.output);
     if (res.event === 'exit') {
       rl.close();
-      return;
+      return true;
     }
+    return false;
   }
 
   rl.prompt();
   rl.on('line', async (line) => {
-    await send(line.trim());
-    rl.prompt();
+    const shouldExit = await send(line.trim());
+    if (!shouldExit) rl.prompt();
   }).on('close', () => {
     process.exit(0);
   });
+}
+
+async function runBot(id, role) {
+  console.log('[BOT] Autonomous mode engaged. Ctrl+C to exit.');
+
+  async function step() {
+    // simple naive strategy: move right/down, tag when possible
+    const rand = Math.random();
+    let cmd;
+    if (rand < 0.25) cmd = '/m d';
+    else if (rand < 0.5) cmd = '/m s';
+    else if (rand < 0.75) cmd = '/tag';
+    else cmd = '/map';
+
+    try {
+      const res = await post('/command', { id, command: cmd });
+      if (res && res.output && cmd !== '/map') {
+        console.log(res.output.split('\n').slice(-2).join(' '));
+      }
+      if (res && res.event === 'exit') return;
+    } catch (e) {
+      console.log('[BOT] error', e.message || e);
+    }
+
+    setTimeout(step, 600);
+  }
+
+  step();
 }
 
 if (require.main === module) {

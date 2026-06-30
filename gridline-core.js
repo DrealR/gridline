@@ -1,4 +1,4 @@
-// GRIDLINE core game logic (v0.1)
+// GRIDLINE core game logic (v0.1+)
 // Pure in-memory state + helper functions for server/clients.
 
 const width = 8;
@@ -6,25 +6,68 @@ const height = 5;
 
 const roles = ["INFILTRATOR", "SENTINEL"];
 
+const ROUND_DURATION_MS = 180000; // 3 minutes
+
 const state = {
   grid: Array.from({ length: height }, () => Array.from({ length: width }, () => '.')),
   players: {}, // id -> { id, role, x, y, symbol }
+  roundActive: false,
+  roundEndsAt: null,
+  lastResult: null,
 };
+
+function resetGrid() {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      state.grid[y][x] = '.';
+    }
+  }
+}
+
+function ensureRound() {
+  const now = Date.now();
+  if (!state.roundActive) {
+    state.roundActive = true;
+    state.roundEndsAt = now + ROUND_DURATION_MS;
+    state.lastResult = null;
+  } else if (state.roundActive && state.roundEndsAt && now >= state.roundEndsAt) {
+    // End round, score, reset grid, immediately start next round
+    let infil = 0;
+    let secured = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (state.grid[y][x] === 'i') infil++;
+        if (state.grid[y][x] === 's') secured++;
+      }
+    }
+    let winner = 'DRAW';
+    if (infil > secured) winner = 'INFILTRATORS';
+    else if (secured > infil) winner = 'SENTINELS';
+    state.lastResult = { infil, secured, winner, endedAt: now };
+    resetGrid();
+    state.roundEndsAt = now + ROUND_DURATION_MS;
+  }
+}
 
 function createPlayer(id) {
   if (state.players[id]) return state.players[id];
   const existingCount = Object.keys(state.players).length;
   const role = roles[existingCount % roles.length];
   const symbol = role === 'INFILTRATOR' ? '◇' : '■';
-  // naive spawn: center-ish
   const x = 2 + (existingCount % 3);
   const y = 1 + (existingCount % 3);
   const player = { id, role, x, y, symbol };
   state.players[id] = player;
+  ensureRound();
   return player;
 }
 
 function getSnapshot() {
+  ensureRound();
+  const now = Date.now();
+  const remainingMs = state.roundActive && state.roundEndsAt
+    ? Math.max(state.roundEndsAt - now, 0)
+    : 0;
   return {
     width,
     height,
@@ -36,6 +79,11 @@ function getSnapshot() {
       y: p.y,
       symbol: p.symbol,
     })),
+    round: {
+      active: state.roundActive,
+      remainingMs,
+      lastResult: state.lastResult,
+    },
   };
 }
 
@@ -61,6 +109,15 @@ function renderForPlayer(id) {
   }
   lines.push('+---------------------------------------+');
   lines.push(`You are: ${me.symbol} (${me.role}_${me.id}) at (${me.x},${me.y})`);
+  const snapshot = getSnapshot();
+  if (snapshot.round && snapshot.round.active) {
+    const secs = Math.ceil(snapshot.round.remainingMs / 1000);
+    lines.push(`Round: ${secs}s remaining`);
+  }
+  if (snapshot.round && snapshot.round.lastResult) {
+    const { infil, secured, winner } = snapshot.round.lastResult;
+    lines.push(`Last round: ${winner} (i=${infil}, s=${secured})`);
+  }
   lines.push('Commands: /m <w/a/s/d>, /tag, /scan, /map, /whoami, /quit');
   return lines.join('\n');
 }
